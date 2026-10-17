@@ -162,28 +162,32 @@ jobs:
           RELEASE_KEY_PASSWORD=$env:ANDROID_RELEASE_KEY_PASSWORD
           "@ | Set-Content -Path (Join-Path $secretsDir "android-signing.properties") -Encoding utf8
 
-      - name: Prepare Python virtual environment
+      # 依据 BUILDING.md 第 674-688 行的官方依赖准备清单
+      - name: Prepare build dependencies (official BUILDING.md recipe)
         shell: pwsh
         run: |
+          Write-Host "--- 1. Python venv ---"
           python -m venv .venv
           if (-not (Test-Path ".venv/Scripts/python.exe")) { throw "venv creation failed" }
           ./.venv/Scripts/python.exe -m pip install --upgrade pip --quiet
-          ./.venv/Scripts/python.exe -c "import sys; print('venv python:', sys.version)"
+          ./.venv/Scripts/python.exe -c "import sys; print(sys.version)"
 
-      - name: Prepare repository-managed TypeScript compiler
-        shell: pwsh
-        run: |
-          $dir = ".ci-tools/typescript"
-          New-Item -ItemType Directory -Force -Path $dir | Out-Null
-          Push-Location $dir
+          Write-Host "--- 2. repository-managed TypeScript (pinned 5.9.3) ---"
+          npm install --prefix .ci-tools/typescript --no-audit --no-fund typescript@5.9.3
+          if (-not (Test-Path ".ci-tools/typescript/node_modules/.bin/tsc.cmd")) { throw "tsc.cmd missing" }
+          .ci-tools/typescript/node_modules/.bin/tsc.cmd --version
+
+          Write-Host "--- 3. workflow ToolPkg deps (pnpm frozen lockfile) ---"
+          Push-Location plugins/packages/buildin/workflow
           try {
-            npm init -y | Out-Null
-            npm install --no-audit --no-fund typescript@5.6.3
-          } finally {
-            Pop-Location
-          }
-          if (-not (Test-Path "$dir/node_modules/.bin/tsc.cmd")) { throw "tsc.cmd not installed" }
-          Get-ChildItem "$dir/node_modules/.bin" | Select-Object -ExpandProperty Name
+            corepack pnpm install --frozen-lockfile
+          } finally { Pop-Location }
+
+          Write-Host "--- 4. rust wasm target + wasm-bindgen CLI (pinned 0.2.122) ---"
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.122 --locked
+          if (-not (Get-Command wasm-bindgen.exe -ErrorAction SilentlyContinue)) { throw "wasm-bindgen not on PATH" }
+          wasm-bindgen.exe --version
 
       - name: Check build environment
         shell: pwsh
