@@ -162,6 +162,14 @@ jobs:
           RELEASE_KEY_PASSWORD=$env:ANDROID_RELEASE_KEY_PASSWORD
           "@ | Set-Content -Path (Join-Path $secretsDir "android-signing.properties") -Encoding utf8
 
+      - name: Prepare Python virtual environment
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          if (-not (Test-Path ".venv/Scripts/python.exe")) { throw "venv creation failed" }
+          ./.venv/Scripts/python.exe -m pip install --upgrade pip --quiet
+          ./.venv/Scripts/python.exe -c "import sys; print('venv python:', sys.version)"
+
       - name: Check build environment
         shell: pwsh
         run: python tools/build_scripts/check_build_environment.py --products app --github-runner
