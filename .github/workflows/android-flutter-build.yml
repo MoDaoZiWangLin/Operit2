@@ -170,6 +170,21 @@ jobs:
           ./.venv/Scripts/python.exe -m pip install --upgrade pip --quiet
           ./.venv/Scripts/python.exe -c "import sys; print('venv python:', sys.version)"
 
+      - name: Prepare repository-managed TypeScript compiler
+        shell: pwsh
+        run: |
+          $dir = ".ci-tools/typescript"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Push-Location $dir
+          try {
+            npm init -y | Out-Null
+            npm install --no-audit --no-fund typescript@5.6.3
+          } finally {
+            Pop-Location
+          }
+          if (-not (Test-Path "$dir/node_modules/.bin/tsc.cmd")) { throw "tsc.cmd not installed" }
+          Get-ChildItem "$dir/node_modules/.bin" | Select-Object -ExpandProperty Name
+
       - name: Check build environment
         shell: pwsh
         run: python tools/build_scripts/check_build_environment.py --products app --github-runner
